@@ -1,0 +1,11 @@
+save_dir: "/home/shiqi/code/Project4-power-grid/pca_koopman/outputs/experiment_1"
+data_dir: "/home/shiqi/code/Project4-power-grid/data"
+predict_num: 10
+pca_dim: 10
+dic_model: 50
+N_State: 6
+Ku_dd: 256
+N_Matrix: 6
+lr: 0.001
+batch_size: 2048
+num_epochs: 1000
