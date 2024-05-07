@@ -48,13 +48,9 @@ def build_training_dataset(config, x_dataset, u_dataset):
     predict_num = config['predict_num']
     x_data = np.concatenate(x_dataset, axis=0)
     u_data = np.concatenate(u_dataset, axis=0)
-    x_scaler = MinMaxScaler()
-    u_scaler = MinMaxScaler()
-    x_data_scaled = x_scaler.fit_transform(x_data)
-    u_data_scaled = u_scaler.fit_transform(u_data)
-    x_data_slices = cut_slides(x_data_scaled, window_size, predict_num)
-    u_data_slices = cut_slides(u_data_scaled, window_size, predict_num)
+    x_data_slices = cut_slides(x_data, window_size, predict_num)
+    u_data_slices = cut_slides(u_data, window_size, predict_num)
     x_data_slices = np.concatenate(x_data_slices, axis=0)
     u_data_slices = np.concatenate(u_data_slices, axis=0)
-    return x_data_slices, u_data_slices, x_scaler, u_scaler
+    return x_data_slices, u_data_slices
     

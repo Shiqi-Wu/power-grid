@@ -101,7 +101,7 @@ def main(config):
     model.to(device)
 
     # Load dataset
-    x_data_slices, u_data_slices, _, _ = build_training_dataset(config, x_dataset, u_dataset)
+    x_data_slices, u_data_slices = build_training_dataset(config, x_dataset, u_dataset)
 
     # Split the data
     x_train, x_test, u_train, u_test = train_test_split(x_data_slices, u_data_slices, test_size=0.2, random_state=42)
