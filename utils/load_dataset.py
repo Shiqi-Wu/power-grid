@@ -1,6 +1,9 @@
 import numpy as np
 import os
 from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
 
 
 def integer_to_one_hot(integer, min_val, max_val):
@@ -38,12 +41,22 @@ def load_dataset_from_files(config):
             et = np.array(integer_to_one_hot(ErrorType, min_val, max_val))
             et_data = np.tile(et, (len(x_data), 1))
             u_data = np.concatenate((uu_data, et_data), axis=1)
+
+
+            # Sample the data
+            x_data = x_data[::config['sample_step'], :]
+            u_data = u_data[::config['sample_step'], :]
+            
             x_dataset.append(x_data)
             u_dataset.append(u_data)
 
     return x_dataset, u_dataset
 
 def build_training_dataset(config, x_dataset, u_dataset):
+    fs, order = 1, 5
+    cutoff = config['cutoff']
+    for i in range(len(x_dataset)):
+        x_dataset[i] = lowpass_filter(x_dataset[i], cutoff, fs, order)
     window_size = np.shape(x_dataset[0])[0]
     predict_num = config['predict_num']
     x_data = np.concatenate(x_dataset, axis=0)
@@ -53,4 +66,16 @@ def build_training_dataset(config, x_dataset, u_dataset):
     x_data_slices = np.concatenate(x_data_slices, axis=0)
     u_data_slices = np.concatenate(u_data_slices, axis=0)
     return x_data_slices, u_data_slices
-    
+
+# 定义Butterworth低通滤波器
+def butter_lowpass(cutoff, fs, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+# 应用低通滤波器
+def lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = filtfilt(b, a, data, axis=0)
+    return y
