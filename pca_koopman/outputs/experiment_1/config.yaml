@@ -1,5 +1,5 @@
-save_dir: "/home/shiqi/code/Project4-power-grid/pca_koopman/outputs/experiment_1"
-data_dir: "/home/shiqi/code/Project4-power-grid/data"
+save_dir: "/Users/shiqi/Documents/PhD/Code/Project3-power-grid/codes/pca_koopman/outputs/experiment_1"
+data_dir: "/Users/shiqi/Documents/PhD/Code/Project3-power-grid/codes/data"
 predict_num: 10
 pca_dim: 10
 dic_model: 50
