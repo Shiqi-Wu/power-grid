@@ -5,6 +5,9 @@ import numpy as np
 import os
 torch.set_default_dtype(torch.float64)
 
+def data_preprocessing(x_data, y_data, u_data, pca_dim):
+    
+
 def build_time_embedding_train_test_dataloader(x_dataset, u_dataset, N = 1, batch_size = 64, test_size = 0.2):
     """
     Splits the given datasets into training and testing sets, applies time embedding, and returns DataLoader objects for both sets.
@@ -81,6 +84,3 @@ def build_time_embedding_dataset(x_dataset, u_dataset, N = 1):
     dataset = torch.utils.data.TensorDataset(x_dataset_time_embedded, y_dataset_time_embedded, u_dataset_time_embedded)
     return dataset
 
-    
-
-            
