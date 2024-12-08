@@ -1,52 +1,98 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.nn.functional as F
 import os
 torch.set_default_dtype(torch.float64)
 
-class TrainableDictionary(nn.modules):
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class BasicBlock(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(BasicBlock, self).__init__()
+        self.fc1 = nn.Linear(in_features, out_features)
+        self.bn1 = nn.BatchNorm1d(out_features)
+        self.fc2 = nn.Linear(out_features, out_features)
+        self.bn2 = nn.BatchNorm1d(out_features)
+
+        self.shortcut = nn.Sequential()
+        if in_features != out_features:
+            self.shortcut = nn.Sequential(
+                nn.Linear(in_features, out_features),
+                nn.BatchNorm1d(out_features)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.fc1(x)))
+        out = self.bn2(self.fc2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, input_dim, dictionary_dim=128):
+        super(ResNet, self).__init__()
+        self.in_features = input_dim
+        
+        self.layer1 = self._make_layer(block, 16, num_blocks[0])
+        self.layer2 = self._make_layer(block, 32, num_blocks[1])
+        self.layer3 = self._make_layer(block, 64, num_blocks[2])
+        self.linear = nn.Linear(64, dictionary_dim)
+
+    def _make_layer(self, block, out_features, num_blocks):
+        layers = []
+        for _ in range(num_blocks):
+            layers.append(block(self.in_features, out_features))
+            self.in_features = out_features
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.linear(out)
+        return out
+
+class TrainableDictionary(nn.Module):
     """
     A neural network module that builds a trainable dictionary for input data.
     Args:
         inputs_dim (int): The dimension of the input data.
         dictionary_dim (int): The dimension of the dictionary output.
-        layers_params (list of int): A list containing the number of units in each hidden layer.
-        activation (nn.Module, optional): The activation function to use between layers. Default is nn.Tanh().
+        resnet_params (tuple): Parameters to define the ResNet structure.
     Methods:
-        build():
-            Constructs the neural network layers based on the provided parameters.
         forward(x):
             Defines the forward pass of the network. Takes an input tensor `x` and returns the concatenated tensor
             of ones, the input `x`, and the dictionary output.
     """
 
-    def __init__(self, inputs_dim, dictionary_dim, layers_params, activation = nn.Tanh()):
+    def __init__(self, inputs_dim, dictionary_dim, num_blocks):
         super(TrainableDictionary, self).__init__()
         self.inputs_dim = inputs_dim
         self.dictionary_dim = dictionary_dim
-        self.layers_params = layers_params
-        self.activation = activation
-        self.build()
         
-    def build(self):
-        self.layers = nn.ModuleList()
-        self.layers.append(nn.Linear(self.inputs_dim, self.layers_params[0]))
-        self.layers.append(self.activation)
-        for i in range(1, len(self.layers_params)):
-            self.layers.append(nn.Linear(self.layers_params[i-1], self.layers_params[i]))
-            self.layers.append(self.activation)
-        self.layers.append(nn.Linear(self.layers_params[-1], self.dictionary_dim))
-    
+        # Initialize the ResNet model
+        self.resnet = ResNet(
+            block=BasicBlock,
+            num_blocks=num_blocks,
+            input_dim=inputs_dim,
+            dictionary_dim=dictionary_dim
+        )
+        
     def forward(self, x):
-        ones = torch.ones(dic.shape[0], 1)
-        dic = x
-        for layer in self.layers:
-            dic = layer(dic)
-        y = torch.cat((ones, x), dim = 1)
-        y = torch.cat((y, dic), dim = 1)
+        ones = torch.ones(x.shape[0], 1, device=x.device)
+        # Pass input through ResNet
+        dic = self.resnet(x)
+        # Concatenate ones, input, and dictionary output
+        y = torch.cat((ones, x), dim=1)
+        y = torch.cat((y, dic), dim=1)
         return y
+
     
-class BlockDiagonalKoopman(nn.modules):
+class BlockDiagonalKoopman(nn.Module):
     """
     A PyTorch module representing a block diagonal Koopman operator.
     Attributes:
@@ -80,23 +126,28 @@ class BlockDiagonalKoopman(nn.modules):
         self.V = nn.Parameter(torch.randn(self.koopman_dim, self.koopman_dim))
 
     def forward_K(self):
-        K = torch.zeros(self.koopman_dim, self.koopman_dim)
+        device = self.blocks[0].device
+        K = torch.zeros(self.koopman_dim, self.koopman_dim, device=device)
+
         for i in range(self.num_blocks):
             angle = self.blocks[i]
             cos = torch.cos(angle)
             sin = torch.sin(angle)
-            K[2*i, 2*i] = cos
-            K[2*i, 2*i+1] = -sin
-            K[2*i+1, 2*i] = sin
-            K[2*i+1, 2*i+1] = cos
+            K[2 * i, 2 * i] = cos
+            K[2 * i, 2 * i + 1] = -sin
+            K[2 * i + 1, 2 * i] = sin
+            K[2 * i + 1, 2 * i + 1] = cos
+
         if self.koopman_dim % 2 != 0:
             K[-1, -1] = 1
+
         return K
+
     
     def forward_V(self):
         return self.V
     
-class TimeEmbeddingBlockDiagonalKoopman(nn.modules):
+class TimeEmbeddingBlockDiagonalKoopman(nn.Module):
     """
     A PyTorch module that implements a time embedding block with a block diagonal Koopman operator.
     Attributes:
@@ -121,16 +172,22 @@ class TimeEmbeddingBlockDiagonalKoopman(nn.modules):
                 torch.Tensor: The output tensor after applying the V matrix.
     """
 
-    def __init__(self, koopman_dim, inputs, layers_params, activation = nn.Tanh()):
+    def __init__(self, dictionary_dim, inputs_dim, num_blocks):
         super(TimeEmbeddingBlockDiagonalKoopman, self).__init__()
-        self.koopman_dim = koopman_dim
-        self.inputs = inputs
-        self.layers_params = layers_params
-        self.activation = activation
+        self.dictionary_dim = dictionary_dim
+        self.koopman_dim = dictionary_dim + 1 + inputs_dim
+        self.inputs_dim = inputs_dim
+        self.num_blocks = num_blocks
         self.build()
 
     def build(self):
-        self.dictionary = TrainableDictionary(self.inputs, self.koopman_dim, self.layers_params, self.activation)
+        # Initialize the TrainableDictionary with the updated signature
+        self.dictionary = TrainableDictionary(
+            inputs_dim=self.inputs_dim,
+            dictionary_dim=self.dictionary_dim,
+            num_blocks=self.num_blocks
+        )
+        # Initialize the Koopman operator
         self.koopman = BlockDiagonalKoopman(self.koopman_dim)
     
     def forward(self, x_dic):
@@ -138,6 +195,7 @@ class TimeEmbeddingBlockDiagonalKoopman(nn.modules):
         V = self.koopman.forward_V()
         y = torch.matmul(x_dic, V)
         y = torch.matmul(y, K)
+        # print(f"y.device: {y.device}, K.device: {K.device}")
         return y
     
     def dictionary_forward(self, x):
@@ -150,3 +208,9 @@ class TimeEmbeddingBlockDiagonalKoopman(nn.modules):
         V = self.koopman.forward_V()
         y = torch.matmul(x_dic, V)
         return y
+    
+    def regularization_loss(self):
+        norm = torch.norm(self.koopman.V, p='fro')
+        inv_nomr = torch.norm(torch.inverse(self.koopman.V), p='fro')
+        condition_number = norm * inv_nomr
+        return 0.00001 * condition_number
