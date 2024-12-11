@@ -56,7 +56,7 @@ def data_preprocessing(x_dataset, u_dataset, pca_dim):
     u_data = (u_data - mean_u) / std_u
     pca = PCA(n_components=pca_dim)
     pca.fit(x_data)
-    pca_matrix = torch.tensor(pca.components_.T, dtype=torch.float64)
+    pca_matrix = torch.tensor(pca.components_, dtype=torch.float64)
     pca_layer = PCALayer(x_data.shape[1], pca_dim, pca_matrix)
     x_data = pca.transform(x_data)
     mean_2 = np.mean(x_data, axis=0)
