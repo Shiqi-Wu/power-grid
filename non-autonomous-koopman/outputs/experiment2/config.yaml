@@ -1,0 +1,14 @@
+save_dir: outputs/experiment2
+data_dir: ../data
+pca_dim: 2
+N: 1
+dictionary_dim: 40
+num_blocks: [2,2,2]
+epochs: 1000
+step_size: 200
+gamma: 0.9
+batch_size: 256
+lr: 0.001 
+multi_step: False
+sample_step: 10
+test_size: 0.2

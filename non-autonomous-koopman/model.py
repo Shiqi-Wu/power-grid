@@ -214,3 +214,71 @@ class TimeEmbeddingBlockDiagonalKoopman(nn.Module):
         inv_nomr = torch.norm(torch.inverse(self.koopman.V), p='fro')
         condition_number = norm * inv_nomr
         return 0.00001 * condition_number
+    
+
+class KoopmanOperatorWithInputs(nn.Module):
+    def __init__(self, koopman_dim, u_dim, num_blocks):
+        super(KoopmanOperatorWithInputs, self).__init__()
+        self.koopman_dim = koopman_dim
+        self.u_dim = u_dim
+        self.num_blocks = num_blocks
+        self.build()
+
+    def build(self):
+        self.operator_nn = ResNet(
+            block=BasicBlock,
+            num_blocks=self.num_blocks,
+            input_dim=self.u_dim,
+            dictionary_dim=self.koopman_dim ** 2
+        )
+
+    def forward(self, u):
+        k_vector = self.operator_nn(u)
+        K = k_vector.view(-1, self.koopman_dim, self.koopman_dim)
+        return K
+    
+class KoopmanModelWithInputs(nn.Module):
+    def __init__(self, koopman_dim, u_dim, num_blocks, blockdiagonalkoopmanmodel):
+        super(KoopmanModelWithInputs, self).__init__()
+        self.koopman_dim = koopman_dim
+        self.inputs_dim = u_dim
+        self.num_blocks = num_blocks
+        self.blockdiagonalkoopmanmodel = blockdiagonalkoopmanmodel
+        self.build()
+    
+    def build(self):
+        self.koopman = KoopmanOperatorWithInputs(
+            koopman_dim=self.koopman_dim,
+            u_dim=self.inputs_dim,
+            num_blocks=self.num_blocks
+        )
+    
+    def forward(self, x_dic, u):
+        K = self.koopman(u)
+        y_dic = torch.bmm(x_dic.unsqueeze(1), K).squeeze(1)
+        return y_dic
+    
+def extract_x(x_dic, N, pca_dim):
+    x = x_dic[:, (N-1) * pca_dim + 1: N * pca_dim + 1]
+    return x
+
+class state_input_network(nn.Module):
+    def __init__(self, koopman_dim, u_dim, num_blocks):
+        super(state_input_network, self).__init__()
+        self.koopman_dim = koopman_dim
+        self.u_dim = u_dim
+        self.num_blocks = num_blocks
+        self.build()
+
+    def build(self):
+        self.operator_nn = ResNet(
+            block=BasicBlock,
+            num_blocks=self.num_blocks,
+            input_dim=self.u_dim + self.koopman_dim,
+            dictionary_dim=self.koopman_dim
+        )
+
+    def forward(self, x_dic, u):
+        xx = torch.cat((x_dic, u), dim=1)
+        yy = self.operator_nn(xx)
+        return yy
