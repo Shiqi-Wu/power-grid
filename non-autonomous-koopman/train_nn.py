@@ -25,12 +25,12 @@ def rescale_residuals(residuals):
     return rescaled_residuals, mean, std
 
 
-def build_residual_dataset_model1(dataloader, model1, device, rescale = True):
+def build_residual_dataset_model1(dataloader, model1, device, sample_step = 10, rescale = True):
     residuals = []
     for x, y, u in dataloader:
         x, y, u = x.to(device), y.to(device), u.to(device)
         x_dic = model1.dictionary_V(x).detach()
-        y_pred = model1.dictionary_forward(x)
+        y_pred = model1.dictionary_forward(x, sample_step)
         y_true = model1.dictionary_V(y)
         residual = y_true - y_pred
         residual = residual.detach()
@@ -131,7 +131,7 @@ def evaluate_one_step_pred_initial(model1, config, train_loader, test_loader, de
     for x, y, u in train_loader:
         x, y, u = x.to(device), y.to(device), u.to(device)
         x_dic = model1.dictionary_V(x)
-        y_dic_pred_1 = model1.dictionary_forward(x)
+        y_dic_pred_1 = model1.dictionary_forward(x, config['sample_step'])
         y_dic_pred = y_dic_pred_1
 
         y_pred = torch.matmul(y_dic_pred, V_inv)[:, 1:config['pca_dim']+1]
@@ -143,7 +143,7 @@ def evaluate_one_step_pred_initial(model1, config, train_loader, test_loader, de
     for x, y, u in test_loader:
         x, y, u = x.to(device), y.to(device), u.to(device)
         x_dic = model1.dictionary_V(x)
-        y_dic_pred_1 = model1.dictionary_forward(x)
+        y_dic_pred_1 = model1.dictionary_forward(x, config['sample_step'])
         y_dic_pred = y_dic_pred_1
 
         y_pred = torch.matmul(y_dic_pred, V_inv)[:, 1:config['pca_dim']+1]

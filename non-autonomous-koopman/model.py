@@ -125,12 +125,12 @@ class BlockDiagonalKoopman(nn.Module):
         
         self.V = nn.Parameter(torch.randn(self.koopman_dim, self.koopman_dim))
 
-    def forward_K(self):
+    def forward_K(self, sample_step = 10):
         device = self.blocks[0].device
         K = torch.zeros(self.koopman_dim, self.koopman_dim, device=device)
 
         for i in range(self.num_blocks):
-            angle = self.blocks[i]
+            angle = self.blocks[i] * 10 / sample_step
             cos = torch.cos(angle)
             sin = torch.sin(angle)
             K[2 * i, 2 * i] = cos
@@ -190,17 +190,18 @@ class TimeEmbeddingBlockDiagonalKoopman(nn.Module):
         # Initialize the Koopman operator
         self.koopman = BlockDiagonalKoopman(self.koopman_dim)
     
-    def forward(self, x_dic):
-        K = self.koopman.forward_K()
+    def forward(self, x_dic, sample_step=10):
+        K = self.koopman.forward_K(sample_step)
         V = self.koopman.forward_V()
         y = torch.matmul(x_dic, V)
         y = torch.matmul(y, K)
         # print(f"y.device: {y.device}, K.device: {K.device}")
         return y
+        
     
-    def dictionary_forward(self, x):
+    def dictionary_forward(self, x, sample_step=10):
         x_dic = self.dictionary(x)
-        y = self.forward(x_dic)
+        y = self.forward(x_dic, sample_step)
         return y
     
     def dictionary_V(self, x):
