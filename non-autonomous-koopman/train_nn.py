@@ -76,8 +76,8 @@ def test_one_epoch_residual(model, criterion, test_loader, device):
     return test_loss / len(test_loader)
 
 def train_residual_model(model1, model2, config, train_loader, test_loader, device):
-    train_loader_new, std_layer_residuals = build_residual_dataset_model1(train_loader, model1, device, rescale = config['rescale_residuals'])
-    test_loader_new, _ = build_residual_dataset_model1(test_loader, model1, device, rescale = config['rescale_residuals'])
+    train_loader_new, std_layer_residuals = build_residual_dataset_model1(train_loader, model1, device, sample_step=config['sample_step'], rescale = config['rescale_residuals'])
+    test_loader_new, _ = build_residual_dataset_model1(test_loader, model1, device, sample_step=config['sample_step'], rescale = config['rescale_residuals'])
     optimizer = torch.optim.Adam(model2.parameters(), lr=config['lr'])
     stepLR = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
     criterion = torch.nn.MSELoss()
