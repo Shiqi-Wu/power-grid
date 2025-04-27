@@ -26,10 +26,10 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.fc1(x)))
+        out = F.tanh(self.bn1(self.fc1(x)))
         out = self.bn2(self.fc2(out))
         out += self.shortcut(x)
-        out = F.relu(out)
+        out = F.tanh(out)
         return out
 
 class ResNet(nn.Module):
@@ -130,7 +130,7 @@ class BlockDiagonalKoopman(nn.Module):
         K = torch.zeros(self.koopman_dim, self.koopman_dim, device=device)
 
         for i in range(self.num_blocks):
-            angle = self.blocks[i] * 10 / sample_step
+            angle = self.blocks[i] * sample_step / 10
             cos = torch.cos(angle)
             sin = torch.sin(angle)
             K[2 * i, 2 * i] = cos

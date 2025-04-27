@@ -76,22 +76,39 @@ def test_one_epoch_residual(model, criterion, test_loader, device):
     return test_loss / len(test_loader)
 
 def train_residual_model(model1, model2, config, train_loader, test_loader, device):
-    train_loader_new, std_layer_residuals = build_residual_dataset_model1(train_loader, model1, device, sample_step=config['sample_step'], rescale = config['rescale_residuals'])
-    test_loader_new, _ = build_residual_dataset_model1(test_loader, model1, device, sample_step=config['sample_step'], rescale = config['rescale_residuals'])
+    train_loader_new, std_layer_residuals = build_residual_dataset_model1(
+        train_loader, model1, device, sample_step=config['sample_step'], rescale=config['rescale_residuals']
+    )
+    test_loader_new, _ = build_residual_dataset_model1(
+        test_loader, model1, device, sample_step=config['sample_step'], rescale=config['rescale_residuals']
+    )
     optimizer = torch.optim.Adam(model2.parameters(), lr=config['lr'])
     stepLR = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=config['gamma'])
     criterion = torch.nn.MSELoss()
 
     train_losses = []
     test_losses = []
-    for epoch in tqdm(range(config['epochs']), desc="Training", unit="epoch"):
+
+    # Wrap the epochs loop with tqdm for a progress bar
+    progress_bar = tqdm(range(config['epochs']), desc="Training Progress", unit="epoch")
+
+    for epoch in progress_bar:
+        # Train for one epoch
         train_loss = train_one_epoch_residual(model2, optimizer, criterion, train_loader_new, device)
+
+        # Test after the epoch
         test_loss = test_one_epoch_residual(model2, criterion, test_loader_new, device)
+
         train_losses.append(train_loss)
         test_losses.append(test_loss)
+
         stepLR.step()
-    tqdm.write(f"Final train loss: {train_losses[-1]:.4e}")
+
+        # Update the progress bar with the current epoch's losses
+        progress_bar.set_postfix({"Train Loss": f"{train_loss:.4e}", "Test Loss": f"{test_loss:.4e}"})
+
     return train_losses, test_losses, std_layer_residuals
+
 
 
 def evaluate_one_step_pred(model1, model2, std_layer_residuals, config, train_loader, test_loader, device):
@@ -164,8 +181,9 @@ def main():
 
     # data preprocessing
     x_dataset = data_delete_columns(x_dataset)
-    rescale_pca_layer, x_dataset_new, u_dataset_new = data_preprocessing(x_dataset, u_dataset, config['pca_dim'])
-
+    # print(len(x_dataset))
+    rescale_pca_layer, x_dataset_new, u_dataset_new = data_preprocessing([x_dataset[0]], [u_dataset[0]], config['pca_dim'])
+    print(x_dataset_new[0].shape, u_dataset_new[0].shape)
     train_loader, test_loader = build_time_embedding_train_test_dataloader(x_dataset_new, u_dataset_new, 1, batch_size=config['batch_size'], test_size=config['test_size'])
 
     # Load model1
@@ -195,6 +213,13 @@ def main():
     model_path = os.path.join(config['save_dir'], 'model_residual.pth')
     torch.save(model_residual.state_dict(), model_path)
     print(f"Model saved to {model_path}")
+
+    # Save pca and std_layer_residuals
+    pca_path = os.path.join(config['save_dir'], 'rescale_pca_layer.pth')
+    torch.save(rescale_pca_layer.state_dict(), pca_path)
+
+    std_path = os.path.join(config['save_dir'], 'std_layer_residuals.pth')
+    torch.save(std_layer_residuals.state_dict(), std_path)
 
     # Save losses
     losses = {'train_losses': train_losses, 'test_losses': test_losses}

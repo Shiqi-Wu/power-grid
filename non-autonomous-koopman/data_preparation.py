@@ -10,7 +10,7 @@ from pca_layers import PCALayer, StdScalerLayer, Rescale_pca_layer
 
 torch.set_default_dtype(torch.float64)
 
-def data_delete_columns(x_dataset, columns = [9, 39, 63]):
+def data_delete_columns(x_dataset, columns = [9, 21, 25, 39, 63]):
     """
     Remove specified columns from each array in the dataset.
     Parameters:
@@ -80,38 +80,42 @@ def data_preprocessing(x_dataset, u_dataset, pca_dim):
     return rescale_pca_layer, x_dataset_new, u_dataset_new
     
 
-def build_time_embedding_train_test_dataloader(x_dataset, u_dataset, N = 1, batch_size = 64, test_size = 0.2):
+def build_time_embedding_train_test_dataloader(x_dataset, u_dataset, N = 1, batch_size = 512, test_size = 0.2):
     """
-    Splits the given datasets into training and testing sets, applies time embedding, and returns DataLoader objects for both sets.
-    Args:
-        x_dataset (list or np.ndarray): The dataset containing the state variables.
-        u_dataset (list or np.ndarray): The dataset containing the control inputs.
-        N (int, optional): The time embedding dimension. Defaults to 1.
-        batch_size (int, optional): The number of samples per batch to load. Defaults to 64.
-        test_size (float, optional): The proportion of the dataset to include in the test split. Defaults to 0.2.
-    Returns:
-        tuple: A tuple containing:
-            - train_loader (torch.utils.data.DataLoader): DataLoader for the training set.
-            - test_loader (torch.utils.data.DataLoader): DataLoader for the testing set.
+    Handles both single and multiple trajectory datasets.
     """
+    if len(x_dataset) == 1:
+        # Single trajectory: split along time axis
+        x_data = x_dataset[0]
+        u_data = u_dataset[0]
+        T = x_data.shape[0]
+        split = int(T * (1 - test_size))
 
-    indices = np.arange(len(x_dataset))
-    np.random.shuffle(indices)
-    split = int(len(indices) * (1 - test_size))
-    train_indices, test_indices = indices[:split], indices[split:]
+        x_train = [x_data[:split]]
+        u_train = [u_data[:split]]
+        x_test = [x_data[split - N:]]  # 保留 N 步历史
+        u_test = [u_data[split - N:]]
 
-    x_train = [x_dataset[i] for i in train_indices]
-    x_test = [x_dataset[i] for i in test_indices]
-    u_train = [u_dataset[i] for i in train_indices]
-    u_test = [u_dataset[i] for i in test_indices]
+    else:
+        # Multiple trajectories: split by samples
+        indices = np.arange(len(x_dataset))
+        np.random.shuffle(indices)
+        split = int(len(indices) * (1 - test_size))
+        train_indices, test_indices = indices[:split], indices[split:]
 
+        x_train = [x_dataset[i] for i in train_indices]
+        x_test = [x_dataset[i] for i in test_indices]
+        u_train = [u_dataset[i] for i in train_indices]
+        u_test = [u_dataset[i] for i in test_indices]
 
+    # 构造 time-embedding 数据集
     train_dataset = build_time_embedding_dataset(x_train, u_train, N)
     test_dataset = build_time_embedding_dataset(x_test, u_test, N)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
+
 
 def build_time_embedding_dataset(x_dataset, u_dataset, N=1):
     """

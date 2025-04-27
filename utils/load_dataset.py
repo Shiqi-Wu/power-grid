@@ -20,6 +20,14 @@ def cut_slides(data, window_size, predict_num):
             data_slices.append(slice)
     return data_slices
 
+# --------- 滑动窗口裁剪函数 ----------
+def sliding_window_split(sequence, window_size=30, stride=10):
+    slices = []
+    for start in range(0, len(sequence) - window_size + 1, stride):
+        end = start + window_size
+        slices.append(sequence[start:end])
+    return slices
+
 def load_dataset_from_files(config):
     data_dir = config['data_dir']
     x_dataset = []
@@ -36,13 +44,14 @@ def load_dataset_from_files(config):
             if x_data.shape[0]!= 3417 or x_data.shape[1]!= 68:
                 print(x_data.shape)
                 # print(data_file_path)
-            uu_data = data_dict['signals'][:, -4:]
-            ErrorType = data_dict['ErrorType']
-            et = np.array(integer_to_one_hot(ErrorType, min_val, max_val))
-            et_data = np.tile(et, (len(x_data), 1))
-            u_data = np.concatenate((uu_data, et_data), axis=1)
+            uu_data = data_dict['signals'][:, -6:-4]
 
+            # ErrorType = data_dict['ErrorType']
+            # et = np.array(integer_to_one_hot(ErrorType, min_val, max_val))
+            # et_data = np.tile(et, (len(x_data), 1))
+            # u_data = np.concatenate((uu_data, et_data), axis=1)
 
+            u_data = uu_data
             # Sample the data
             x_data = x_data[::config['sample_step'], :]
             u_data = u_data[::config['sample_step'], :]
